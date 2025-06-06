@@ -1,45 +1,81 @@
-import { Tabs } from 'expo-router';
-import React from 'react';
-import { Platform } from 'react-native';
+import { Tabs } from "expo-router";
+import React, { useContext } from "react";
+import { Platform } from "react-native";
 
-import { HapticTab } from '@/components/HapticTab';
-import { IconSymbol } from '@/components/ui/IconSymbol';
-import TabBarBackground from '@/components/ui/TabBarBackground';
-import { Colors } from '@/constants/Colors';
-import { useColorScheme } from '@/hooks/useColorScheme';
+import { HapticTab } from "@/components/HapticTab";
+import TabBarBackground from "@/components/ui/TabBarBackground";
+import { darkTheme, lightTheme } from "@/constants/Colors";
+import ThemeContext from "@/context/ThemeContext";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
+  const { theme } = useContext(ThemeContext);
+  const colors = theme === "dark" ? darkTheme : lightTheme;
 
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
+        tabBarActiveTintColor: colors.white,
         headerShown: false,
         tabBarButton: HapticTab,
         tabBarBackground: TabBarBackground,
+        tabBarShowLabel: false,
         tabBarStyle: Platform.select({
           ios: {
-            // Use a transparent background on iOS to show the blur effect
-            position: 'absolute',
+            position: "absolute",
+            backgroundColor: colors.black,
+            borderTopWidth: 0,
           },
-          default: {},
+          default: {
+            position: "absolute",
+            backgroundColor: colors.black,
+            borderTopWidth: 0,
+          },
         }),
-      }}>
+        tabBarIconStyle: {
+          marginTop: 5,
+        },
+      }}
+    >
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Home',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
+          title: "Home",
+          tabBarIcon: ({ color }) => (
+            <MaterialCommunityIcons name="home" size={35} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
-        name="explore"
+        name="settings"
         options={{
-          title: 'Explore',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
+          title: "Configurações",
+          tabBarIcon: ({ color }) => (
+            <MaterialCommunityIcons name="cog" size={30} color={color} />
+          ),
         }}
       />
+      <Tabs.Screen
+        name="today"
+        options={{
+          // This tab will no longer show up in the tab bar.
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="startChallenge"
+        options={{
+          // This tab will no longer show up in the tab bar.
+          href: null,
+        }}
+      />
+      {/* <Tabs.Screen
+        name="congratulations"
+        options={{
+          // This tab will no longer show up in the tab bar.
+          href: null,
+        }}
+      /> */}
     </Tabs>
   );
 }
