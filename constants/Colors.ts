@@ -29,6 +29,7 @@ export const lightTheme = {
   white: "white",
   black: "black",
   date: "#888",
+  red: "#FF2C2C",
 };
 
 export const darkTheme = {
@@ -60,4 +61,5 @@ export const darkTheme = {
   white: "white",
   black: "black",
   date: "#888",
+  red: "#FF2C2C",
 };

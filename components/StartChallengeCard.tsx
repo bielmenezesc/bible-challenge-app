@@ -6,35 +6,41 @@ import {
   Dimensions,
   FlatList,
   StyleSheet,
-  Switch,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
 import Feather from "react-native-vector-icons/Feather";
+import DailyReminder from "./DailyReminder";
 
 const totalChapters = 1189;
 const screenWidth = Dimensions.get("window").width;
 const ITEM_WIDTH = screenWidth / 5.11;
 
 export default function StartChallengeCard({
+  editingPlan,
   days,
   setDays,
   onStart,
+  onEdit,
+  onDelete,
   enableReminders,
   setEnableReminders,
+  setCloseEdit,
 }: {
+  editingPlan: boolean;
   days: string;
   setDays: (val: string) => void;
-  onStart: () => void;
+  onStart?: () => void;
+  onEdit?: () => void;
+  onDelete?: () => void;
   enableReminders: boolean;
   setEnableReminders: (val: boolean) => void;
+  setCloseEdit: (val: boolean) => void;
 }) {
   const listRef = useRef<FlatList>(null);
   const chaptersPerDay = Math.ceil(totalChapters / parseInt(days, 10));
-  const expectedEndDate = new Date(
-    new Date().getTime() + parseInt(days, 10) * 24 * 60 * 60 * 1000
-  );
+  console.log(days);
 
   const { theme, textSize } = useContext(ThemeContext);
   const colors = theme === "dark" ? darkTheme : lightTheme;
@@ -57,10 +63,35 @@ export default function StartChallengeCard({
 
   return (
     <View style={styles.card}>
+      {/* Botão de sair no canto superior direito */}
+      <TouchableOpacity
+        style={{
+          position: "absolute",
+          top: 10,
+          right: 10,
+          zIndex: 1,
+        }}
+        onPress={() => {
+          setCloseEdit(true);
+        }}
+      >
+        <View
+          style={{
+            backgroundColor: "#f2f2f2", // cinza claro
+            borderRadius: 20,
+            padding: 8,
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Feather name="x" size={textSizes.title} color={colors.iconColor} />
+        </View>
+      </TouchableOpacity>
+
       <View style={styles.cardHeader}>
         <Feather
           name="book-open"
-          size={20}
+          size={textSizes.sectionTitle}
           color={colors.iconColor}
           style={{ marginRight: 8 }}
         />
@@ -142,17 +173,26 @@ export default function StartChallengeCard({
             )}
           />
         </View>
-
-        <View style={styles.switchContainer}>
-          <Switch value={enableReminders} onValueChange={setEnableReminders} />
-          <Text style={styles.switchLabel}>Ativar lembretes diários</Text>
-        </View>
       </View>
 
       <View style={styles.cardFooter}>
-        <TouchableOpacity style={styles.button} onPress={onStart}>
-          <Text style={styles.buttonText}>Iniciar Desafio</Text>
-        </TouchableOpacity>
+        {/* Notifications */}
+        <DailyReminder />
+        {editingPlan ? (
+          <View style={styles.buttonRow}>
+            <TouchableOpacity onPress={onDelete} style={styles.buttonInverse}>
+              <Text style={styles.buttonTextInverse}>Deletar</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity onPress={onEdit} style={styles.button}>
+              <Text style={styles.buttonText}>Editar</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <TouchableOpacity style={styles.button} onPress={onStart}>
+            <Text style={styles.buttonText}>Iniciar Desafio</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );
@@ -174,12 +214,13 @@ const createStyles = (colors: typeof lightTheme, textSizes: typeof medium) =>
       marginBottom: 12,
     },
     cardTitle: {
-      fontSize: textSizes.subtitle,
+      fontSize: textSizes.sectionTitle,
       fontWeight: "bold",
       color: colors.textColor,
     },
     cardContent: {
       marginBottom: 12,
+      marginTop: 16,
     },
     infoRow: {
       flexDirection: "row",
@@ -215,11 +256,34 @@ const createStyles = (colors: typeof lightTheme, textSizes: typeof medium) =>
       borderRadius: 8,
       alignItems: "center",
       justifyContent: "center",
+      flex: 1,
     },
     buttonText: {
       color: colors.buttonText,
       fontSize: textSizes.subtitle,
       fontWeight: "bold",
       letterSpacing: 0.5,
+    },
+    buttonInverse: {
+      backgroundColor: colors.buttonInverseBackground,
+      borderWidth: 1.5,
+      borderColor: colors.red,
+      paddingVertical: 12,
+      paddingHorizontal: 24,
+      borderRadius: 8,
+      alignItems: "center",
+      justifyContent: "center",
+      flex: 1,
+    },
+    buttonTextInverse: {
+      color: colors.red,
+      fontSize: textSizes.paragraph,
+      fontWeight: "bold",
+      letterSpacing: 0.5,
+    },
+    buttonRow: {
+      flexDirection: "row",
+      marginTop: 12,
+      gap: 8,
     },
   });

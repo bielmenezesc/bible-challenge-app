@@ -1,37 +1,30 @@
+import CurrentChallengeCard from "@/components/CurrentChallengeCard";
 import StartChallengeCard from "@/components/StartChallengeCard";
 import { darkTheme, lightTheme } from "@/constants/Colors";
 import { large, medium, small } from "@/constants/TextSizes";
 import ThemeContext from "@/context/ThemeContext";
 import {
+  deleteReadingPlanFromStorage,
+  editReadingPlan,
   generateReadingPlan,
   getTodayReading,
   loadAsyncStorage,
   loadReadingPlanFromStorage,
+  ReadingDay,
   saveAsyncStorage,
 } from "@/scripts/bible-api";
 import { fetchChapter } from "@/scripts/bible-service";
+import { BibleChapter } from "@/scripts/types";
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import React, { useCallback, useContext, useState } from "react";
-import {
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
-import { AnimatedCircularProgress } from "react-native-circular-progress";
+import { Alert, ScrollView, StyleSheet, Text, View } from "react-native";
 import ConfettiCannon from "react-native-confetti-cannon";
 import { Appbar, Paragraph, Title } from "react-native-paper";
 
-type BibleChapter = {
-  reference: string;
-  content: string;
-  verses: [];
-};
-
 export default function HomeScreen() {
   const [activePlan, setActivePlan] = useState(null);
+  const [editingPlan, setEditPlan] = useState<Boolean>(false);
   const [todayReading, setTodayReading] = useState(null);
   const [currentChapter, setCurrentChapter] = useState<BibleChapter | null>(
     null
@@ -47,32 +40,88 @@ export default function HomeScreen() {
   const [enableReminders, setEnableReminders] = useState(true);
   const [showConfetti, setShowConfetti] = useState(false);
 
+  const handleCloseEditChallenge = async () => {
+    setEditPlan(false);
+  };
+
   const handleStartChallenge = async () => {
     await generateReadingPlan(Number(daysParam), "users-plan-2");
     navigation.navigate("today");
+  };
+
+  const handleEditChallenge = async () => {
+    await editReadingPlan(activePlan, Number(daysParam), "users-plan-2");
+    navigation.navigate("today");
+  };
+
+  const handleDeleteChallenge = async () => {
+    Alert.alert(
+      "Tem certeza?",
+      "Você quer mesmo deletar este desafio? Essa ação não pode ser desfeita.",
+      [
+        {
+          text: "Cancelar",
+          style: "cancel",
+        },
+        {
+          text: "Deletar",
+          onPress: async () => {
+            await deleteReadingPlanFromStorage("users-plan-2");
+            setActivePlan(null);
+            console.log(activePlan);
+            setEditPlan(false);
+            setTodayReading(null);
+            setProgress(0);
+            setCurrentChapter(null);
+          },
+          style: "destructive",
+        },
+      ]
+    );
+  };
+
+  const loadAndSetReadingPlan = async (planName: string) => {
+    const plan = await loadReadingPlanFromStorage(planName);
+    if (plan) {
+      setActivePlan(plan);
+      setDaysParam(plan?.length.toString());
+    }
+    return plan;
+  };
+
+  const loadAndSetTodayReading = async () => {
+    const today = await getTodayReading();
+    setTodayReading(today);
+    return today;
+  };
+
+  const calculateAndSetProgress = (plan: ReadingDay[]) => {
+    const completed = plan.filter((day) => day.completed).length;
+    const percentage = Math.round((completed / plan.length) * 100);
+    setProgress(percentage);
+  };
+
+  const loadAndSetCurrentChapter = async (todayReading: ReadingDay) => {
+    const loadedCurrentChapterIndex = await loadAsyncStorage(
+      "currentChapterIndex"
+    );
+
+    const chapter = await fetchChapter(
+      todayReading.references[loadedCurrentChapterIndex]
+    );
+    setCurrentChapter(chapter);
   };
 
   useFocusEffect(
     useCallback(() => {
       const fetchData = async () => {
         try {
-          const plan = await loadReadingPlanFromStorage("users-plan-2");
-          setActivePlan(plan);
+          setEditPlan(false);
+          const plan = await loadAndSetReadingPlan("users-plan-2");
           if (plan) {
-            const today = await getTodayReading();
-            setTodayReading(today);
-            const completed = plan.filter((day) => day.completed).length;
-            const percentage = Math.round((completed / plan.length) * 100);
-            setProgress(percentage);
-
-            const loadedCurrentChapterIndex = await loadAsyncStorage(
-              "currentChapterIndex"
-            );
-
-            const chapter = await fetchChapter(
-              today.references[loadedCurrentChapterIndex]
-            );
-            setCurrentChapter(chapter);
+            const today = await loadAndSetTodayReading();
+            calculateAndSetProgress(plan);
+            await loadAndSetCurrentChapter(today);
 
             setShowConfetti(await loadAsyncStorage("confetti"));
             setTimeout(async () => {
@@ -89,7 +138,7 @@ export default function HomeScreen() {
     }, [])
   );
 
-  if (currentChapter) {
+  if (!!currentChapter || !activePlan) {
     return (
       <View style={StyleSheet.absoluteFill}>
         <Appbar.Header
@@ -116,107 +165,54 @@ export default function HomeScreen() {
                 Escolha seu desafio, defina seu ritmo e cresça na fé
                 diariamente.
               </Paragraph>
-              <View style={styles.buttonRow}>
-                <TouchableOpacity
-                  style={styles.button}
-                  onPress={() => navigation.navigate("startChallenge")}
-                >
-                  <Text style={styles.buttonText}>Começar Desafio</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.buttonInverse}
-                  onPress={() => navigation.navigate("today")}
-                >
-                  <Text style={styles.buttonTextInverse}>Leitura de Hoje</Text>
-                </TouchableOpacity>
-              </View>
             </View>
           </View>
 
           <View style={styles.section}>
-            <Title style={styles.sectionTitle}>
-              {activePlan ? "Seu Desafio Ativo" : "Escolha um Desafio!"}
-            </Title>
+            <View style={styles.cardHeader}>
+              <Feather
+                name="award"
+                size={textSizes.title}
+                color={colors.iconColor}
+                style={{ marginRight: 8 }}
+              />
+              <Text style={styles.cardTitle}>
+                {activePlan ? "Continue seu Desafio!" : "Escolha um Desafio!"}
+              </Text>
+            </View>
 
-            {activePlan ? (
-              <View style={styles.card}>
-                <View style={{ alignItems: "center" }}>
-                  <View style={styles.cardHeader}>
-                    <Feather
-                      name="award"
-                      size={textSizes.sectionTitle}
-                      color={colors.iconColor}
-                      style={{ marginRight: 8 }}
-                    />
-                    <Text
-                      style={
-                        (styles.cardTitle,
-                        [
-                          {
-                            fontSize: textSizes.sectionTitle,
-                            fontWeight: "bold",
-                          },
-                        ])
-                      }
-                    >
-                      Continue sua Jornada!
-                    </Text>
-                  </View>
-                  <View style={{ marginTop: 24 }}>
-                    <AnimatedCircularProgress
-                      size={180}
-                      width={12}
-                      fill={(todayReading?.day / activePlan.length) * 100}
-                      tintColor="#4CAF50"
-                      backgroundColor="#E0E0E0"
-                      lineCap="round"
-                    >
-                      {() => (
-                        <>
-                          <Text
-                            style={{
-                              fontSize: textSizes.dayCircularProgress,
-                              marginBottom: -15,
-                            }}
-                          >
-                            {todayReading?.day}
-                          </Text>
-                          <Text
-                            style={{
-                              fontWeight: "bold",
-                              fontSize: textSizes.subtitle,
-                            }}
-                          >
-                            {activePlan.length} dias
-                          </Text>
-                        </>
-                      )}
-                    </AnimatedCircularProgress>
-                  </View>
-                </View>
-                <View style={(styles.cardFooter, [{ marginTop: 25 }])}>
-                  <TouchableOpacity
-                    onPress={() => navigation.navigate("today")}
-                    style={styles.button}
-                  >
-                    <Text style={styles.buttonText}>
-                      {todayReading?.completed
-                        ? "Ver Leitura Completada"
-                        : `Continuar em ${currentChapter?.reference}`}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
+            {activePlan && !editingPlan ? (
+              <CurrentChallengeCard
+                setEditPlan={setEditPlan}
+                navigation={navigation}
+                todayReading={todayReading}
+                activePlan={activePlan}
+                currentChapter={currentChapter}
+              />
             ) : (
               <>
-                <StartChallengeCard
-                  days={daysParam}
-                  setDays={setDaysParam}
-                  onStart={handleStartChallenge}
-                  enableReminders={enableReminders}
-                  setEnableReminders={setEnableReminders}
-                />
+                {editingPlan ? (
+                  <StartChallengeCard
+                    editingPlan={true}
+                    days={daysParam}
+                    setDays={setDaysParam}
+                    onEdit={handleEditChallenge}
+                    enableReminders={enableReminders}
+                    setEnableReminders={setEnableReminders}
+                    onDelete={handleDeleteChallenge}
+                    setCloseEdit={handleCloseEditChallenge}
+                  />
+                ) : (
+                  <StartChallengeCard
+                    editingPlan={false}
+                    days={daysParam}
+                    setDays={setDaysParam}
+                    onStart={handleStartChallenge}
+                    enableReminders={enableReminders}
+                    setEnableReminders={setEnableReminders}
+                    setCloseEdit={handleCloseEditChallenge}
+                  />
+                )}
               </>
             )}
           </View>
@@ -276,7 +272,7 @@ const createStyles = (colors: typeof lightTheme, textSizes: typeof medium) =>
     },
     centered: {
       alignItems: "center",
-      marginBottom: 24,
+      marginBottom: 12,
     },
     title: {
       fontSize: textSizes.title,
@@ -299,22 +295,6 @@ const createStyles = (colors: typeof lightTheme, textSizes: typeof medium) =>
     section: {
       flex: 1,
       padding: 16,
-      backgroundColor: colors.background,
-    },
-    sectionTitle: {
-      textAlign: "center",
-      marginBottom: 16,
-      fontSize: textSizes.sectionTitle,
-      fontWeight: "bold",
-      color: colors.textColor,
-    },
-    card: {
-      borderWidth: 1,
-      borderColor: colors.borderColor,
-      borderRadius: 8,
-      padding: 16,
-      marginBottom: 24,
-      backgroundColor: colors.cardBackground,
     },
     progress: {
       marginVertical: 16,
@@ -344,17 +324,16 @@ const createStyles = (colors: typeof lightTheme, textSizes: typeof medium) =>
       color: colors.textColor,
     },
     button: {
-      backgroundColor: colors.buttonColor,
-      paddingVertical: 12,
-      paddingHorizontal: 24,
-      borderRadius: 8,
+      paddingVertical: 14,
+      paddingHorizontal: 24, // ajusta a largura com base no texto
+      borderRadius: 24,
       alignItems: "center",
       justifyContent: "center",
-      flex: 1,
+      alignSelf: "center", // opcional, centraliza se o container permitir
     },
     buttonText: {
       color: "#fff",
-      fontSize: textSizes.paragraph,
+      fontSize: textSizes.subtitle,
       fontWeight: "bold",
       letterSpacing: 0.5,
     },
@@ -375,21 +354,27 @@ const createStyles = (colors: typeof lightTheme, textSizes: typeof medium) =>
       fontWeight: "bold",
       letterSpacing: 0.5,
     },
-    cardHeader: {
-      flexDirection: "row",
-      alignItems: "center",
-    },
-    cardTitle: {
-      fontSize: textSizes.subtitle,
-      fontWeight: "bold",
-      color: colors.textColor,
-    },
-    cardFooter: {
-      marginTop: 12,
-    },
     progressText: {
       marginBottom: 8,
       fontWeight: "500",
+      color: colors.textColor,
+    },
+    cardHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: 16,
+    },
+    cardTitle: {
+      fontSize: textSizes.sectionTitle,
+      fontWeight: "bold",
+      color: colors.textColor,
+    },
+    sectionTitle: {
+      textAlign: "center",
+      marginBottom: 16,
+      fontSize: textSizes.sectionTitle,
+      fontWeight: "bold",
       color: colors.textColor,
     },
   });

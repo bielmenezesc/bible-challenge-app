@@ -3,10 +3,24 @@
 import { darkTheme, lightTheme } from "@/constants/Colors";
 import { large, medium, small } from "@/constants/TextSizes";
 import ThemeContext from "@/context/ThemeContext";
-import { getTodayReading, updateReadingDayStatus } from "@/scripts/bible-api";
+import {
+  getTodayReading,
+  loadAsyncStorage,
+  markDayAsCompleted,
+  ReadingDay,
+  saveAsyncStorage,
+} from "@/scripts/bible-api";
 import { fetchChapter } from "@/scripts/bible-service";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import {
+  addNote,
+  deleteNote,
+  loadNotes,
+  updateNote,
+} from "@/scripts/notes-api";
+import { BibleChapter } from "@/scripts/types";
+import { Note } from "@/types/Note";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import { LinearGradient } from "expo-linear-gradient";
 import React, { useCallback, useContext, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -20,25 +34,6 @@ import {
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import { Appbar, Button, ProgressBar } from "react-native-paper";
 import Feather from "react-native-vector-icons/Feather";
-
-type BibleChapter = {
-  reference: string;
-  content: string;
-  verses: [];
-};
-
-type ReadingDay = {
-  day: number;
-  completed: boolean;
-  references: string[];
-  referencesPt: string[];
-};
-
-type Note = {
-  id: string;
-  content: string;
-  createdAt: string; // ISO string
-};
 
 export default function TodayReadingScreen() {
   const navigation = useNavigation();
@@ -87,6 +82,8 @@ export default function TodayReadingScreen() {
             reading.references[loadedCurrentChapterIndex]
           );
           setCurrentChapter(chapter);
+
+          console.log("chapter: " + chapter.reference);
 
           const loadedNotes = await loadNotes(chapter.reference);
           setNotes(loadedNotes);
@@ -249,7 +246,7 @@ export default function TodayReadingScreen() {
                   {todayReading?.references.length ?? "?"} capítulos
                 </Text>
                 <ProgressBar
-                  color={colors.buttonColor}
+                  color="#f6d365"
                   progress={
                     (readChapters.length || 0) /
                     (todayReading?.references.length || 1)
@@ -265,7 +262,7 @@ export default function TodayReadingScreen() {
                         styles.bullet,
                         {
                           backgroundColor: readChapters.includes(ref)
-                            ? colors.buttonColor
+                            ? "#f6d365"
                             : "#ccc",
                         },
                       ]}
@@ -285,7 +282,6 @@ export default function TodayReadingScreen() {
               </View>
               <View style={styles.cardFooter}>
                 <TouchableOpacity
-                  style={styles.button}
                   onPress={async () => {
                     if (todayReading) {
                       await markDayAsCompleted(todayReading.day);
@@ -293,15 +289,26 @@ export default function TodayReadingScreen() {
                     }
                   }}
                 >
-                  <View style={{ flexDirection: "row", alignItems: "center" }}>
-                    <Feather
-                      name="check-circle"
-                      size={textSizes.iconSize}
-                      color={colors.iconButton}
-                      style={{ marginRight: 8 }}
-                    />
-                    <Text style={styles.buttonText}>Marque como Completo</Text>
-                  </View>
+                  <LinearGradient
+                    colors={["#f6d365", "#fda085"]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.button}
+                  >
+                    <View
+                      style={{ flexDirection: "row", alignItems: "center" }}
+                    >
+                      <Feather
+                        name="check-circle"
+                        size={textSizes.iconSize}
+                        color={colors.iconButton}
+                        style={{ marginRight: 8 }}
+                      />
+                      <Text style={styles.buttonText}>
+                        Marque como Completo
+                      </Text>
+                    </View>
+                  </LinearGradient>
                 </TouchableOpacity>
               </View>
             </View>
@@ -415,13 +422,6 @@ export default function TodayReadingScreen() {
                   </TouchableOpacity>
                 </View>
 
-                {/* <View style={styles.cardContent}>
-                    {currentChapter?.content.split("\n\n").map((p, idx) => (
-                      <Text key={idx} style={styles.paragraph}>
-                        {p}
-                      </Text>
-                    ))}
-                  </View> */}
                 <View style={styles.cardContent}>
                   {currentChapter?.verses.map((verse) => (
                     <Text key={verse.verse} style={styles.paragraph}>
@@ -616,76 +616,6 @@ export default function TodayReadingScreen() {
   );
 }
 
-// API
-
-const addNote = async (chapterId: string, content: string): Promise<Note> => {
-  const key = chapterId.replace(/\s+/g, "");
-  const newNote: Note = {
-    id: Date.now().toString(),
-    content,
-    createdAt: new Date().toISOString(),
-  };
-
-  const stored = await AsyncStorage.getItem(key);
-  const existingNotes: Note[] = stored ? JSON.parse(stored) : [];
-
-  const updatedNotes = [...existingNotes, newNote];
-  await AsyncStorage.setItem(key, JSON.stringify(updatedNotes));
-
-  return newNote;
-};
-
-const updateNote = async (
-  chapterId: string,
-  noteId: string,
-  newContent: string
-): Promise<Note | null> => {
-  const key = chapterId.replace(/\s+/g, "");
-  const stored = await AsyncStorage.getItem(key);
-  const existingNotes: Note[] = stored ? JSON.parse(stored) : [];
-
-  const updatedNotes = existingNotes.map((note) =>
-    note.id === noteId ? { ...note, content: newContent } : note
-  );
-
-  await AsyncStorage.setItem(key, JSON.stringify(updatedNotes));
-
-  const updatedNote = updatedNotes.find((note) => note.id === noteId) || null;
-  return updatedNote;
-};
-
-const loadNotes = async (chapterId: string): Promise<Note[]> => {
-  const key = chapterId.replace(/\s+/g, "");
-  const stored = await AsyncStorage.getItem(key);
-  return stored ? JSON.parse(stored) : [];
-};
-
-const deleteNote = async (chapterId: string, noteId: string): Promise<void> => {
-  const key = chapterId.replace(/\s+/g, "");
-  const stored = await AsyncStorage.getItem(key);
-  const existingNotes: Note[] = stored ? JSON.parse(stored) : [];
-
-  const updatedNotes = existingNotes.filter((note) => note.id !== noteId);
-
-  await AsyncStorage.setItem(key, JSON.stringify(updatedNotes));
-};
-
-async function markDayAsCompleted(day: number): Promise<void> {
-  await updateReadingDayStatus("users-plan-2", day, true);
-  await saveAsyncStorage("readChapters", []);
-  await saveAsyncStorage("currentChapterIndex", 0);
-  await saveAsyncStorage("confetti", true);
-}
-
-const saveAsyncStorage = async (key: string, content: any): Promise<void> => {
-  await AsyncStorage.setItem(key, JSON.stringify(content));
-};
-
-const loadAsyncStorage = async (key: string): Promise<any> => {
-  const stored = await AsyncStorage.getItem(key);
-  return stored ? JSON.parse(stored) : [];
-};
-
 const createStyles = (colors: typeof lightTheme, textSizes: typeof medium) =>
   StyleSheet.create({
     container: {
@@ -735,12 +665,11 @@ const createStyles = (colors: typeof lightTheme, textSizes: typeof medium) =>
       height: 12,
       borderRadius: 6,
       marginRight: 8,
-      backgroundColor: colors.gray,
     },
     card: {
       borderWidth: 1,
       borderColor: colors.borderColor,
-      borderRadius: 8,
+      borderRadius: 24,
       padding: 16,
       marginBottom: 24,
       backgroundColor: colors.cardBackground,
@@ -782,7 +711,7 @@ const createStyles = (colors: typeof lightTheme, textSizes: typeof medium) =>
       backgroundColor: colors.buttonColor,
       paddingVertical: 12,
       paddingHorizontal: 24,
-      borderRadius: 8,
+      borderRadius: 16,
       alignItems: "center",
       justifyContent: "center",
     },

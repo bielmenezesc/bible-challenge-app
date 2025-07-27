@@ -1,0 +1,6 @@
+export type ReadingDay = {
+  day: number;
+  completed: boolean;
+  references: string[];
+  referencesPt: string[];
+};

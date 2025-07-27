@@ -62,20 +62,6 @@ export default function TabLayout() {
           href: null,
         }}
       />
-      <Tabs.Screen
-        name="startChallenge"
-        options={{
-          // This tab will no longer show up in the tab bar.
-          href: null,
-        }}
-      />
-      {/* <Tabs.Screen
-        name="congratulations"
-        options={{
-          // This tab will no longer show up in the tab bar.
-          href: null,
-        }}
-      /> */}
     </Tabs>
   );
 }

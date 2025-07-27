@@ -1,12 +1,14 @@
+import DailyReminder from "@/components/DailyReminder";
+import { exportAllNotesAsPDF } from "@/components/PDFGenerator";
 import { darkTheme, lightTheme } from "@/constants/Colors";
 import { large, medium, small } from "@/constants/TextSizes";
 import ThemeContext from "@/context/ThemeContext";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useNavigation } from "@react-navigation/native";
 import React, { useContext, useState } from "react";
-import { ScrollView, StyleSheet, View } from "react-native";
+import { ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 import DropDownPicker from "react-native-dropdown-picker";
-import { Appbar, Divider, Switch, Text } from "react-native-paper";
+import { Appbar, Divider, Text } from "react-native-paper";
 import Feather from "react-native-vector-icons/Feather";
 
 export default function SettingsScreen() {
@@ -179,37 +181,27 @@ export default function SettingsScreen() {
           </View>
 
           {/* Notifications */}
-          <View style={styles.card}>
-            <Text style={styles.title}>Notificações</Text>
-            <Text style={styles.infoLabel}>
-              Gerencie suas perferências de notificações
-            </Text>
+          <DailyReminder />
 
-            <View style={styles.cardContent}>
-              <View style={styles.notificationRow}>
-                <View style={styles.notificationHeader}>
-                  <Feather
-                    name="bell"
-                    color={colors.iconColor}
-                    size={20}
-                    marginRight={8}
-                  />
-                  <Text style={styles.cardTitle}>Ativar Notificações</Text>
+          {/* DriveUploader */}
+          {/* <Button
+            title="Export Notes as PDF"
+            onPress={() => exportAllNotesAsPDF("users-plan-2")}
+          /> */}
+
+          <TouchableOpacity
+            onPress={() => exportAllNotesAsPDF("users-plan-2")}
+            activeOpacity={0.8}
+          >
+            <View style={styles.card}>
+              <View style={styles.textContainer}>
+                <Feather name="download" size={26} style={styles.icon} />
+                <View>
+                  <Text style={styles.subtitle}>Exportar Notas como PDF</Text>
                 </View>
-
-                <Switch
-                  value={enableNotifications}
-                  onValueChange={handleNotificationToggle}
-                  trackColor={{ false: "#ccc", true: "lightGreen" }}
-                />
               </View>
-
-              <Text style={styles.infoLabel}>
-                Receba diariamente uma notificação para lembrar-lo de continuar
-                sua leitura
-              </Text>
             </View>
-          </View>
+          </TouchableOpacity>
 
           {/* About */}
           <View style={styles.card}>
@@ -326,5 +318,16 @@ const createStyles = (colors: typeof lightTheme, textSizes: typeof medium) =>
       color: colors.iconColor,
       marginRight: 8,
       size: 20,
+    },
+    textContainer: {
+      flex: 1,
+      alignItems: "center",
+      flexDirection: "row",
+      gap: 6,
+    },
+    subtitle: {
+      fontSize: textSizes.sectionTitle,
+      marginTop: 2,
+      color: colors.textColor,
     },
   });

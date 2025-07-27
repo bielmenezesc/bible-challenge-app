@@ -212,6 +212,74 @@ export function generateReadingPlan(
   return plan;
 }
 
+export function editReadingPlan(
+  existingPlan: ReadingDay[],
+  totalDays: number,
+  planName: string
+): ReadingDay[] {
+  const allReferences = getAllChapterReferences();
+  const allReferencesPt = getAllChapterReferencesPT();
+
+  // Capítulos que já foram lidos
+  const readReferences: string[] = [];
+  const readReferencesPt: string[] = [];
+
+  existingPlan.forEach((day) => {
+    if (day.completed) {
+      readReferences.push(...day.references);
+      readReferencesPt.push(...day.referencesPt);
+    }
+  });
+
+  // Capítulos restantes (não lidos ainda)
+  const readCount = readReferences.length;
+  const remainingReferences = allReferences.slice(readCount);
+  const remainingReferencesPt = allReferencesPt.slice(readCount);
+
+  // Dias já concluídos
+  const completedDays = existingPlan.filter((day) => day.completed);
+  const remainingDays = totalDays - completedDays.length;
+
+  if (remainingDays <= 0) {
+    // Tudo já foi lido ou número de dias inválido
+    saveReadingPlanToStorage(completedDays, planName);
+    return completedDays;
+  }
+
+  // Redistribuição dos capítulos restantes para os novos dias
+  const totalRemainingChapters = remainingReferences.length;
+  const baseChaptersPerDay = Math.floor(totalRemainingChapters / remainingDays);
+  const extraDays = totalRemainingChapters % remainingDays;
+
+  const updatedPlan: ReadingDay[] = [...completedDays];
+  let currentIndex = 0;
+
+  for (let i = 1; i <= remainingDays; i++) {
+    const chaptersToday = baseChaptersPerDay + (i <= extraDays ? 1 : 0);
+
+    const refs = remainingReferences.slice(
+      currentIndex,
+      currentIndex + chaptersToday
+    );
+    const refsPt = remainingReferencesPt.slice(
+      currentIndex,
+      currentIndex + chaptersToday
+    );
+
+    updatedPlan.push({
+      day: updatedPlan.length + 1,
+      references: refs,
+      referencesPt: refsPt,
+      completed: false,
+    });
+
+    currentIndex += chaptersToday;
+  }
+
+  saveReadingPlanToStorage(updatedPlan, planName);
+  return updatedPlan;
+}
+
 // Capítulo anterior e próximo
 export function getAdjacentChapters(reference: string): {
   prev: string | null;
@@ -327,6 +395,13 @@ export async function getTodayReading(): Promise<ReadingDay | null> {
   return nextDay;
 }
 
+export async function markDayAsCompleted(day: number): Promise<void> {
+  await updateReadingDayStatus("users-plan-2", day, true);
+  await saveAsyncStorage("readChapters", []);
+  await saveAsyncStorage("currentChapterIndex", 0);
+  await saveAsyncStorage("confetti", true);
+}
+
 export const saveAsyncStorage = async (
   key: string,
   content: any
@@ -337,4 +412,17 @@ export const saveAsyncStorage = async (
 export const loadAsyncStorage = async (key: string): Promise<any> => {
   const stored = await AsyncStorage.getItem(key);
   return stored ? JSON.parse(stored) : [];
+};
+
+export const deleteReadingPlanFromStorage = async (
+  key: string
+): Promise<void> => {
+  try {
+    await AsyncStorage.removeItem(`readingPlan:${key}`);
+    await saveAsyncStorage("readChapters", []);
+    await saveAsyncStorage("currentChapterIndex", 0);
+    await saveAsyncStorage("confetti", false);
+  } catch (error) {
+    console.error("Erro ao deletar dados do AsyncStorage:", error);
+  }
 };
